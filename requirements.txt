@@ -1,7 +1,3 @@
-flask
-opencv-python
-numpy
-requests
-moviepy
-mediapipe
-Pillow
+numpy==1.26.4
+mediapipe==0.10.21
+opencv-python==4.11.0.86
