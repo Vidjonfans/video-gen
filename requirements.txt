@@ -3,6 +3,5 @@ opencv-python
 numpy
 requests
 moviepy
+mediapipe
 Pillow
-dlib
-face-recognition
