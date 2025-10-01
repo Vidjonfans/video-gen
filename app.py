@@ -35,32 +35,35 @@ async def fetch_image(url: str):
 
 
 
-def animate_image(image, out_path, frames=60, fps=24):
+def animate_image(image, out_path, fps=24):
     height, width = image.shape[:2]
     center_x, center_y = width // 2, height // 2
 
+    total_duration = 4  # seconds
+    frames = fps * total_duration  # 96 frames (if fps=24)
+    
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     writer = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
 
     written = 0
     for f in range(frames):
-        t = f / frames
+        t = f / frames   # 0 → 1 normalized time (full video)
 
-        # ---- Reveal effect (opening circle mask) ----
-        if t < 0.7:  # first 70% of video
-            radius = int(np.interp(t, [0, 0.7], [10, max(width, height)]))
+        if t < 0.5:  
+            # ---- Reveal effect (2 sec = first 50% video) ----
+            progress = t / 0.5   # normalize 0 → 1
+            radius = int(np.interp(progress, [0, 1], [10, max(width, height)]))
             mask = np.zeros((height, width), dtype=np.uint8)
             cv2.circle(mask, (center_x, center_y), radius, 255, -1)
             animated = cv2.bitwise_and(image, image, mask=mask)
-        else:
-            animated = image.copy()
 
-        # ---- Zoom out effect in last 30% ----
-        if t > 0.7:
-            zoom_factor = np.interp(t, [0.7, 1.0], [1.0, 0.6])  # zoom-out smoothly
+        else:
+            # ---- Zoom out effect (last 2 sec = second 50%) ----
+            progress = (t - 0.5) / 0.5   # normalize 0 → 1
+            zoom_factor = np.interp(progress, [0, 1], [1.0, 0.6])  # smooth zoom-out
             new_w = int(width * zoom_factor)
             new_h = int(height * zoom_factor)
-            zoomed = cv2.resize(animated, (new_w, new_h))
+            zoomed = cv2.resize(image, (new_w, new_h))
 
             # put zoomed in center
             canvas = np.zeros_like(image)
