@@ -50,17 +50,23 @@ def animate_image(image, out_path, fps=24):
         t = f / frames   # 0 → 1 normalized time (full video)
 
         if t < 0.5:  
-            # ---- Reveal effect (2 sec = first 50% video) ----
+            # ---- Reveal effect (first 2 sec) ----
             progress = t / 0.5   # normalize 0 → 1
-            radius = int(np.interp(progress, [0, 1], [10, max(width, height)]))
+            # easing (ease-out quadratic → start slow, end fast)
+            eased = progress ** 2  
+
+            radius = int(np.interp(eased, [0, 1], [10, max(width, height)]))
             mask = np.zeros((height, width), dtype=np.uint8)
             cv2.circle(mask, (center_x, center_y), radius, 255, -1)
             animated = cv2.bitwise_and(image, image, mask=mask)
 
         else:
-            # ---- Zoom out effect (last 2 sec = second 50%) ----
+            # ---- Zoom out effect (last 2 sec) ----
             progress = (t - 0.5) / 0.5   # normalize 0 → 1
-            zoom_factor = np.interp(progress, [0, 1], [1.0, 0.6])  # smooth zoom-out
+            # easing (ease-in-out → smooth zoom)
+            eased = (1 - np.cos(progress * np.pi)) / 2  
+
+            zoom_factor = np.interp(eased, [0, 1], [1.0, 0.6])
             new_w = int(width * zoom_factor)
             new_h = int(height * zoom_factor)
             zoomed = cv2.resize(image, (new_w, new_h))
@@ -88,7 +94,6 @@ def animate_image(image, out_path, fps=24):
         duration = total_frames / fps_val
 
     return written, duration
-
 
 
 
