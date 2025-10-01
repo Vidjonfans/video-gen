@@ -31,7 +31,11 @@ async def fetch_image(url: str):
         return None
 
 # ---- Animate: point expanding + zoom out ----
-def animate_image(image, out_path, frames=40, fps=12):
+
+
+
+
+def animate_image(image, out_path, frames=60, fps=24):
     height, width = image.shape[:2]
     center_x, center_y = width // 2, height // 2
 
@@ -42,24 +46,28 @@ def animate_image(image, out_path, frames=40, fps=12):
     for f in range(frames):
         t = f / frames
 
-        # ---- Expanding circle ----
-        radius = int((min(width, height) // 4) * (t*2 if t < 0.5 else 1))
-        mask = np.zeros_like(image, dtype=np.uint8)
-        cv2.circle(mask, (center_x, center_y), radius, (255, 255, 255), -1)
+        # ---- Reveal effect (opening circle mask) ----
+        if t < 0.7:  # first 70% of video
+            radius = int(np.interp(t, [0, 0.7], [10, max(width, height)]))
+            mask = np.zeros((height, width), dtype=np.uint8)
+            cv2.circle(mask, (center_x, center_y), radius, 255, -1)
+            animated = cv2.bitwise_and(image, image, mask=mask)
+        else:
+            animated = image.copy()
 
-        animated = cv2.bitwise_and(image, mask)
-
-        # ---- Zoom out effect at the end ----
-        if t > 0.6:
-            zoom_factor = 1.0 + (t - 0.6) * 1.5  # gradual zoom-out
+        # ---- Zoom out effect in last 30% ----
+        if t > 0.7:
+            zoom_factor = np.interp(t, [0.7, 1.0], [1.0, 0.6])  # zoom-out smoothly
             new_w = int(width * zoom_factor)
             new_h = int(height * zoom_factor)
             zoomed = cv2.resize(animated, (new_w, new_h))
 
-            # crop center to original size
-            x1 = (new_w - width) // 2
-            y1 = (new_h - height) // 2
-            animated = zoomed[y1:y1+height, x1:x1+width]
+            # put zoomed in center
+            canvas = np.zeros_like(image)
+            x1 = (width - new_w) // 2
+            y1 = (height - new_h) // 2
+            canvas[y1:y1+new_h, x1:x1+new_w] = zoomed
+            animated = canvas
 
         writer.write(animated)
         written += 1
@@ -77,6 +85,13 @@ def animate_image(image, out_path, frames=40, fps=12):
         duration = total_frames / fps_val
 
     return written, duration
+
+
+
+
+
+
+
 
 # ---- Browser-friendly fix (ffmpeg re-encode) ----
 def fix_mp4(out_path):
