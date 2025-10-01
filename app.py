@@ -30,48 +30,35 @@ async def fetch_image(url: str):
         print(f"[ERROR] fetch_image failed: {e}")
         return None
 
-# ---- Animate: point expanding + zoom out ----
 
-
-
-
-def animate_image(image, out_path, fps=24):
+# ============================================
+# ---- Animation 1: Vertical Reveal + Zoom out
+# ============================================
+def animate_reveal_zoomout(image, out_path, fps=24):
     height, width = image.shape[:2]
-
-    total_duration = 4  # seconds
-    frames = fps * total_duration  # 96 frames (if fps=24)
+    total_duration = 4
+    frames = fps * total_duration
     
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     writer = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
 
     written = 0
     for f in range(frames):
-        t = f / frames   # 0 → 1 normalized time (full video)
-
-        if t < 0.5:  
-            # ---- Vertical Reveal (first 2 sec) ----
-            progress = t / 0.5   # normalize 0 → 1
-            eased = progress ** 2  # slow start, then faster
-
-            # कितनी height तक image दिखेगी
+        t = f / frames
+        if t < 0.5:
+            progress = t / 0.5
+            eased = progress ** 2
             reveal_h = int(height * eased * 0.5)
-
-            # top + bottom से reveal करें
             animated = np.zeros_like(image)
             animated[:reveal_h, :] = image[:reveal_h, :]
             animated[height-reveal_h:, :] = image[height-reveal_h:, :]
-
         else:
-            # ---- Zoom out effect (last 2 sec) ----
-            progress = (t - 0.5) / 0.5   # normalize 0 → 1
+            progress = (t - 0.5) / 0.5
             eased = (1 - np.cos(progress * np.pi)) / 2  
-
             zoom_factor = np.interp(eased, [0, 1], [1.0, 0.6])
             new_w = int(width * zoom_factor)
             new_h = int(height * zoom_factor)
             zoomed = cv2.resize(image, (new_w, new_h))
-
-            # put zoomed in center
             canvas = np.zeros_like(image)
             x1 = (width - new_w) // 2
             y1 = (height - new_h) // 2
@@ -82,24 +69,57 @@ def animate_image(image, out_path, fps=24):
         written += 1
 
     writer.release()
+    return get_video_duration(out_path), written
 
-    # ✅ Duration calculate
+
+# ============================================
+# ---- Animation 2: Rotate (gol gol) + Zoom in
+# ============================================
+def animate_rotate_zoomin(image, out_path, fps=24):
+    height, width = image.shape[:2]
+    total_duration = 4
+    frames = fps * total_duration
+    
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
+
+    center = (width // 2, height // 2)
+
+    written = 0
+    for f in range(frames):
+        t = f / frames
+        # rotation angle (0 → 360 degrees)
+        angle = 360 * t
+        M = cv2.getRotationMatrix2D(center, angle, 1.0)
+
+        # Zoom-in effect towards end
+        zoom_factor = np.interp(t, [0, 1], [1.0, 1.5])
+        M[0, 0] *= zoom_factor
+        M[0, 1] *= zoom_factor
+        M[1, 0] *= zoom_factor
+        M[1, 1] *= zoom_factor
+        M[0, 2] += center[0] * (1 - zoom_factor)
+        M[1, 2] += center[1] * (1 - zoom_factor)
+
+        rotated = cv2.warpAffine(image, M, (width, height), borderMode=cv2.BORDER_REFLECT)
+
+        writer.write(rotated)
+        written += 1
+
+    writer.release()
+    return get_video_duration(out_path), written
+
+
+# ---- Helper: calculate duration ----
+def get_video_duration(out_path):
     cap = cv2.VideoCapture(out_path)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps_val = cap.get(cv2.CAP_PROP_FPS)
     cap.release()
-
     duration = 0
     if fps_val > 0:
         duration = total_frames / fps_val
-
-    return written, duration
-
-
-
-
-
-
+    return duration
 
 
 # ---- Browser-friendly fix (ffmpeg re-encode) ----
@@ -121,31 +141,45 @@ def fix_mp4(out_path):
     except Exception as e:
         print("[ERROR] ffmpeg failed:", e)
 
+
 # ---- API endpoint ----
 @app.get("/")
 def home():
-    return {"message": "Point animation API running"}
+    return {"message": "Animation API running", "animations": ["reveal_zoomout", "rotate_zoomin"]}
+
 
 @app.get("/process")
-async def process(request: Request, image_url: str = Query(..., description="Public image URL")):
+async def process(
+    request: Request,
+    image_url: str = Query(..., description="Public image URL"),
+    animation: str = Query("reveal_zoomout", description="Animation type: reveal_zoomout | rotate_zoomin")
+):
     img = await fetch_image(image_url)
     if img is None:
         return {"error": "Image download failed or invalid URL"}
 
     out_path = os.path.join(OUTDIR, f"anim_{uuid.uuid4().hex}.mp4")
-    frame_count, duration = animate_image(img, out_path)
+
+    if animation == "reveal_zoomout":
+        duration, frames = animate_reveal_zoomout(img, out_path)
+    elif animation == "rotate_zoomin":
+        duration, frames = animate_rotate_zoomin(img, out_path)
+    else:
+        return {"error": "Invalid animation type!"}
 
     # ✅ Browser friendly
     fix_mp4(out_path)
 
-    # ✅ Full public URL
+    # ✅ Public URL
     base_url = str(request.base_url).rstrip("/")
     file_name = os.path.basename(out_path)
     return {
         "video_url": f"{base_url}/outputs/{file_name}",
-        "frames_written": frame_count,
-        "duration_seconds": duration
+        "frames_written": frames,
+        "duration_seconds": duration,
+        "animation": animation
     }
+
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=10000, reload=False)
