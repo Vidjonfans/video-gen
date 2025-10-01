@@ -37,7 +37,6 @@ async def fetch_image(url: str):
 
 def animate_image(image, out_path, fps=24):
     height, width = image.shape[:2]
-    center_x, center_y = width // 2, height // 2
 
     total_duration = 4  # seconds
     frames = fps * total_duration  # 96 frames (if fps=24)
@@ -50,20 +49,21 @@ def animate_image(image, out_path, fps=24):
         t = f / frames   # 0 → 1 normalized time (full video)
 
         if t < 0.5:  
-            # ---- Reveal effect (first 2 sec) ----
+            # ---- Vertical Reveal (first 2 sec) ----
             progress = t / 0.5   # normalize 0 → 1
-            # easing (ease-out quadratic → start slow, end fast)
-            eased = progress ** 2  
+            eased = progress ** 2  # slow start, then faster
 
-            radius = int(np.interp(eased, [0, 1], [10, max(width, height)]))
-            mask = np.zeros((height, width), dtype=np.uint8)
-            cv2.circle(mask, (center_x, center_y), radius, 255, -1)
-            animated = cv2.bitwise_and(image, image, mask=mask)
+            # कितनी height तक image दिखेगी
+            reveal_h = int(height * eased * 0.5)
+
+            # top + bottom से reveal करें
+            animated = np.zeros_like(image)
+            animated[:reveal_h, :] = image[:reveal_h, :]
+            animated[height-reveal_h:, :] = image[height-reveal_h:, :]
 
         else:
             # ---- Zoom out effect (last 2 sec) ----
             progress = (t - 0.5) / 0.5   # normalize 0 → 1
-            # easing (ease-in-out → smooth zoom)
             eased = (1 - np.cos(progress * np.pi)) / 2  
 
             zoom_factor = np.interp(eased, [0, 1], [1.0, 0.6])
@@ -94,6 +94,7 @@ def animate_image(image, out_path, fps=24):
         duration = total_frames / fps_val
 
     return written, duration
+
 
 
 
