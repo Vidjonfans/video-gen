@@ -117,25 +117,33 @@ def animate_center_reveal_zoomout(image, out_path, fps=24):
             animated[center_y:y2, :] = image[center_y:y2, :]
 
         else:
-            # Phase 2: Zoom out
+            # Phase 2: Zoom OUTWARDS (bahar ki taraf)
             progress = (t - 0.5) / 0.5
             eased = (1 - np.cos(progress * np.pi)) / 2  
-            zoom_factor = np.interp(eased, [0, 1], [1.0, 0.6])
+            
+            # 👇 yaha pe change kiya (1.0 → 1.5)
+            zoom_factor = np.interp(eased, [0, 1], [1.0, 1.5])
+            
             new_w = int(width * zoom_factor)
             new_h = int(height * zoom_factor)
             zoomed = cv2.resize(image, (new_w, new_h))
 
             canvas = np.zeros_like(image)
-            x1 = (width - new_w) // 2
-            y1 = (height - new_h) // 2
-            canvas[y1:y1+new_h, x1:x1+new_w] = zoomed
-            animated = canvas
+            
+            # center crop from zoomed image (overflow crop karna hoga)
+            x1 = (new_w - width) // 2
+            y1 = (new_h - height) // 2
+            x2 = x1 + width
+            y2 = y1 + height
+
+            animated = zoomed[y1:y2, x1:x2]
 
         writer.write(animated)
         written += 1
 
     writer.release()
     return get_video_duration(out_path), written
+
 
 
 
