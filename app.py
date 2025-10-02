@@ -7,12 +7,31 @@ from fastapi import FastAPI, Query, Request
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
+
+
+
+
+
+
 # ✅ Import animation functions
 from animations import (
     animate_reveal_zoomout,
     animate_rotate_zoomin,
+    animate_center_reveal_zoomout,
     fix_mp4
 )
+
+
+
+
+
+
+
+
+
+
+
+
 
 # FastAPI app
 app = FastAPI()
@@ -41,14 +60,14 @@ async def fetch_image(url: str):
 # ---- API endpoint ----
 @app.get("/")
 def home():
-    return {"message": "Animation API running", "animations": ["reveal_zoomout", "rotate_zoomin"]}
+    return {"message": "Animation API running", "animations": ["reveal_zoomout", "rotate_zoomin","center_reveal_zoomout",]}
 
 
 @app.get("/process")
 async def process(
     request: Request,
     image_url: str = Query(..., description="Public image URL"),
-    animation: str = Query("reveal_zoomout", description="Animation type: reveal_zoomout | rotate_zoomin")
+    animation: str = Query("reveal_zoomout", description="Animation type: reveal_zoomout | rotate_zoomin | center_reveal_zoomout")
 ):
     img = await fetch_image(image_url)
     if img is None:
@@ -56,10 +75,23 @@ async def process(
 
     out_path = os.path.join(OUTDIR, f"anim_{uuid.uuid4().hex}.mp4")
 
+
+
+
+
+    
+
     if animation == "reveal_zoomout":
         duration, frames = animate_reveal_zoomout(img, out_path)
     elif animation == "rotate_zoomin":
         duration, frames = animate_rotate_zoomin(img, out_path)
+        
+        elif animation == "center_reveal_zoomout":
+        duration, frames = animate_center_reveal_zoomout(img, out_path)
+
+
+
+    
     else:
         return {"error": "Invalid animation type!"}
 
