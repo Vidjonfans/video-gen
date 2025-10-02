@@ -7,12 +7,6 @@ from fastapi import FastAPI, Query, Request
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-
-
-
-
-
-
 # ✅ Import animation functions
 from animations import (
     animate_reveal_zoomout,
@@ -21,18 +15,6 @@ from animations import (
     fix_mp4
 )
 
-
-
-
-
-
-
-
-
-
-
-
-
 # FastAPI app
 app = FastAPI()
 
@@ -40,7 +22,6 @@ app = FastAPI()
 OUTDIR = "outputs"
 os.makedirs(OUTDIR, exist_ok=True)
 app.mount("/outputs", StaticFiles(directory=OUTDIR), name="outputs")
-
 
 # ---- Helper: download image ----
 async def fetch_image(url: str):
@@ -56,12 +37,13 @@ async def fetch_image(url: str):
         print(f"[ERROR] fetch_image failed: {e}")
         return None
 
-
 # ---- API endpoint ----
 @app.get("/")
 def home():
-    return {"message": "Animation API running", "animations": ["reveal_zoomout", "rotate_zoomin","center_reveal_zoomout",]}
-
+    return {
+        "message": "Animation API running",
+        "animations": ["reveal_zoomout", "rotate_zoomin", "center_reveal_zoomout"]
+    }
 
 @app.get("/process")
 async def process(
@@ -75,22 +57,15 @@ async def process(
 
     out_path = os.path.join(OUTDIR, f"anim_{uuid.uuid4().hex}.mp4")
 
-
-
-
-
-    
-
-  if animation == "reveal_zoomout":
-    duration, frames = animate_reveal_zoomout(img, out_path)
-elif animation == "rotate_zoomin":
-    duration, frames = animate_rotate_zoomin(img, out_path)
-elif animation == "center_reveal_zoomout":
-    duration, frames = animate_center_reveal_zoomout(img, out_path)
-else:
-    return {"error": "Invalid animation type!"}
-
-
+    # ✅ FIXED INDENTATION HERE
+    if animation == "reveal_zoomout":
+        duration, frames = animate_reveal_zoomout(img, out_path)
+    elif animation == "rotate_zoomin":
+        duration, frames = animate_rotate_zoomin(img, out_path)
+    elif animation == "center_reveal_zoomout":
+        duration, frames = animate_center_reveal_zoomout(img, out_path)
+    else:
+        return {"error": "Invalid animation type!"}
 
     # ✅ Browser friendly
     fix_mp4(out_path)
@@ -104,7 +79,6 @@ else:
         "duration_seconds": duration,
         "animation": animation
     }
-
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=10000, reload=False)
