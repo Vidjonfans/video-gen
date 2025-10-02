@@ -81,7 +81,7 @@ async def process(
 
     
 
-   if animation == "reveal_zoomout":
+  if animation == "reveal_zoomout":
     duration, frames = animate_reveal_zoomout(img, out_path)
 elif animation == "rotate_zoomin":
     duration, frames = animate_rotate_zoomin(img, out_path)
@@ -89,6 +89,7 @@ elif animation == "center_reveal_zoomout":
     duration, frames = animate_center_reveal_zoomout(img, out_path)
 else:
     return {"error": "Invalid animation type!"}
+
 
 
     # ✅ Browser friendly
