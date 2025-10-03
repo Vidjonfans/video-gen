@@ -7,6 +7,12 @@ from fastapi import FastAPI, Query, Request
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
+
+
+
+
+
+
 # ✅ Import animation functions
 from animations import (
     animate_reveal_zoomout,
@@ -14,6 +20,12 @@ from animations import (
     animate_center_reveal_zoomout,
     fix_mp4
 )
+
+
+
+
+
+
 
 # FastAPI app
 app = FastAPI()
@@ -37,6 +49,13 @@ async def fetch_image(url: str):
         print(f"[ERROR] fetch_image failed: {e}")
         return None
 
+
+
+
+
+
+
+
 # ---- API endpoint ----
 @app.get("/")
 def home():
@@ -51,6 +70,13 @@ async def process(
     image_url: str = Query(..., description="Public image URL"),
     animation: str = Query("reveal_zoomout", description="Animation type: reveal_zoomout | rotate_zoomin | center_reveal_zoomout")
 ):
+
+
+
+
+
+
+    
     img = await fetch_image(image_url)
     if img is None:
         return {"error": "Image download failed or invalid URL"}
