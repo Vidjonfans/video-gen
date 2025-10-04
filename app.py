@@ -7,25 +7,14 @@ from fastapi import FastAPI, Query, Request
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
-
-
-
-
-
-
 # ✅ Import animation functions
 from animations import (
     animate_reveal_zoomout,
     animate_rotate_zoomin,
     animate_center_reveal_zoomout,
+    animate_pan_zoom,   # 👈 NEW animation added
     fix_mp4
 )
-
-
-
-
-
-
 
 # FastAPI app
 app = FastAPI()
@@ -50,61 +39,62 @@ async def fetch_image(url: str):
         return None
 
 
-
-
-
-
-
-
 # ---- API endpoint ----
 @app.get("/")
 def home():
     return {
-        "message": "Animation API running",
-        "animations": ["reveal_zoomout", "rotate_zoomin", "center_reveal_zoomout"]
+        "message": "Animation API running successfully 🎬",
+        "available_animations": [
+            "reveal_zoomout",
+            "rotate_zoomin",
+            "center_reveal_zoomout",
+            "pan_zoom"  # 👈 NEW animation visible here
+        ]
     }
+
 
 @app.get("/process")
 async def process(
     request: Request,
     image_url: str = Query(..., description="Public image URL"),
-    animation: str = Query("reveal_zoomout", description="Animation type: reveal_zoomout | rotate_zoomin | center_reveal_zoomout")
+    animation: str = Query(
+        "reveal_zoomout",
+        description="Animation type: reveal_zoomout | rotate_zoomin | center_reveal_zoomout | pan_zoom"
+    )
 ):
-
-
-
-
-
-
-    
     img = await fetch_image(image_url)
     if img is None:
         return {"error": "Image download failed or invalid URL"}
 
     out_path = os.path.join(OUTDIR, f"anim_{uuid.uuid4().hex}.mp4")
 
-    # ✅ FIXED INDENTATION HERE
+    # ✅ Animation selection logic
     if animation == "reveal_zoomout":
         duration, frames = animate_reveal_zoomout(img, out_path)
     elif animation == "rotate_zoomin":
         duration, frames = animate_rotate_zoomin(img, out_path)
     elif animation == "center_reveal_zoomout":
         duration, frames = animate_center_reveal_zoomout(img, out_path)
+    elif animation == "pan_zoom":
+        duration, frames = animate_pan_zoom(img, out_path)  # 👈 4th animation integrated
     else:
         return {"error": "Invalid animation type!"}
 
-    # ✅ Browser friendly
+    # ✅ Convert to browser-compatible MP4
     fix_mp4(out_path)
 
-    # ✅ Public URL
+    # ✅ Build public URL for output video
     base_url = str(request.base_url).rstrip("/")
     file_name = os.path.basename(out_path)
+
     return {
         "video_url": f"{base_url}/outputs/{file_name}",
         "frames_written": frames,
         "duration_seconds": duration,
-        "animation": animation
+        "animation": animation,
+        "status": "✅ Success"
     }
+
 
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=10000, reload=False)
