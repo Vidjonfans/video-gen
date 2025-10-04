@@ -119,12 +119,13 @@ def animate_center_reveal_zoomout(image, out_path, fps=24):
 # ============================================
 def animate_pan_zoom(image, out_path, fps=24):
     height, width = image.shape[:2]
-    total_duration = 7  # duration = 7 sec
+    total_duration = 7
     frames = int(fps * total_duration)
-
+    
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     writer = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
 
+    written = 0
     for f in range(frames):
         t = f / frames
         zoom_factor = np.interp(np.sin(t * np.pi), [-1, 1], [0.9, 1.1])
@@ -141,9 +142,11 @@ def animate_pan_zoom(image, out_path, fps=24):
         animated = zoomed[y1:y1+height, x1:x1+width]
 
         writer.write(animated)
+        written += 1
 
     writer.release()
-    return get_video_duration(out_path)
+    return get_video_duration(out_path), written  # ✅ fixed
+
 
 
 # ============================================
