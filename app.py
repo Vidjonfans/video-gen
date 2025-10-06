@@ -48,8 +48,6 @@ def home():
             "rotate_zoomin",
             "center_reveal_zoomout",
             "smooth_zoom_pan",
-            
-           
         ]
     }
 
@@ -60,7 +58,7 @@ async def process(
     image_url: str = Query(..., description="Public image URL"),
     animation: str = Query(
         "reveal_zoomout",
-        description="Animation type: reveal_zoomout | rotate_zoomin | smooth_zoom_pan | center_reveal_zoomout "
+        description="Animation type: reveal_zoomout | rotate_zoomin | smooth_zoom_pan | center_reveal_zoomout"
     )
 ):
     img = await fetch_image(image_url)
@@ -77,8 +75,7 @@ async def process(
     elif animation == "center_reveal_zoomout":
         duration, frames = animate_center_reveal_zoomout(img, out_path)
     elif animation == "smooth_zoom_pan":
-    duration, frames = animate_smooth_zoom_pan(img, out_path)
-   
+        duration, frames = animate_smooth_zoom_pan(img, out_path)
     else:
         return {"error": "Invalid animation type!"}
 
