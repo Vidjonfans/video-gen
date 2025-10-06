@@ -11,7 +11,7 @@ import uvicorn
 from animations.reveal_zoomout import animate_reveal_zoomout
 from animations.rotate_zoomin import animate_rotate_zoomin
 from animations.center_reveal_zoomout import animate_center_reveal_zoomout
-from animations.animate_smooth_zoom_pan import animate_smooth_zoom_pan
+from animations.blur_zooming_roatation import animate_smooth_zoom_pan
 from animations.utils import fix_mp4
 
 
