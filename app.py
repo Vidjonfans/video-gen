@@ -69,22 +69,20 @@ async def process(
 
     out_path = os.path.join(OUTDIR, f"anim_{uuid.uuid4().hex}.mp4")
 
-    # ✅ Animation selection logic
+      # ✅ Animation selection logic
     if animation == "reveal_zoomout":
         duration, frames = animate_reveal_zoomout(img, out_path)
     elif animation == "rotate_zoomin":
         duration, frames = animate_rotate_zoomin(img, out_path)
     elif animation == "center_reveal_zoomout":
         duration, frames = animate_center_reveal_zoomout(img, out_path)
-        elif animation == "smooth_zoom_pan":
+    elif animation == "smooth_zoom_pan":
         duration, frames = animate_smooth_zoom_pan(img, out_path)
     elif animation == "reveal_vertical_zoomout":
         duration, frames = animate_reveal_vertical_zoomout(img, out_path)
-
-        
-      
     else:
         return {"error": "Invalid animation type!"}
+
 
     # ✅ Convert to browser-compatible MP4
     fix_mp4(out_path)
