@@ -76,10 +76,13 @@ async def process(
         duration, frames = animate_rotate_zoomin(img, out_path)
     elif animation == "center_reveal_zoomout":
         duration, frames = animate_center_reveal_zoomout(img, out_path)
-    elif animation == "smooth_zoom_pan":
+        elif animation == "smooth_zoom_pan":
         duration, frames = animate_smooth_zoom_pan(img, out_path)
-        elif animation == "reveal_vertical_zoomout":
+    elif animation == "reveal_vertical_zoomout":
         duration, frames = animate_reveal_vertical_zoomout(img, out_path)
+
+        
+      
     else:
         return {"error": "Invalid animation type!"}
 
