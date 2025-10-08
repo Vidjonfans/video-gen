@@ -12,6 +12,7 @@ from animations.reveal_zoomout import animate_reveal_zoomout
 from animations.rotate_zoomin import animate_rotate_zoomin
 from animations.center_reveal_zoomout import animate_center_reveal_zoomout
 from animations.blur_zooming_roatation import animate_smooth_zoom_pan
+from animations.reveal_zoomout import animate_reveal_vertical_zoomout
 from animations.utils import fix_mp4
 
 
@@ -48,6 +49,7 @@ def home():
             "rotate_zoomin",
             "center_reveal_zoomout",
             "smooth_zoom_pan",
+            "reveal_vertical_zoomout",
         ]
     }
 
@@ -58,7 +60,7 @@ async def process(
     image_url: str = Query(..., description="Public image URL"),
     animation: str = Query(
         "reveal_zoomout",
-        description="Animation type: reveal_zoomout | rotate_zoomin | smooth_zoom_pan | center_reveal_zoomout"
+        description="Animation type: reveal_zoomout | rotate_zoomin | smooth_zoom_pan | reveal_vertical_zoomout | center_reveal_zoomout"
     )
 ):
     img = await fetch_image(image_url)
@@ -76,6 +78,8 @@ async def process(
         duration, frames = animate_center_reveal_zoomout(img, out_path)
     elif animation == "smooth_zoom_pan":
         duration, frames = animate_smooth_zoom_pan(img, out_path)
+        elif animation == "reveal_vertical_zoomout":
+        duration, frames = animate_reveal_vertical_zoomout(img, out_path)
     else:
         return {"error": "Invalid animation type!"}
 
