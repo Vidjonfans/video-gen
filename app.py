@@ -12,7 +12,7 @@ from animations.reveal_zoomout import animate_reveal_zoomout
 from animations.rotate_zoomin import animate_rotate_zoomin
 from animations.center_reveal_zoomout import animate_center_reveal_zoomout
 from animations.blur_zooming_roatation import animate_smooth_zoom_pan
-from animations.reveal_zoomout import animate_reveal_vertical_zoomout
+from animations.reveal_vertical import animate_reveal_vertical_zoomout
 from animations.utils import fix_mp4
 
 
