@@ -14,11 +14,12 @@ def animate_blur_reveal(image, out_path, fps=24):
     for f in range(frames):
         t = f / frames
 
-        if t < 0.4:
-            # 🌀 Phase 1: Blur reveal (0s - 1.6s)
-            progress = t / 0.4
-            eased = progress ** 2  # smooth easing
-            blur_strength = int(np.interp(1 - eased, [0, 1], [0, 25]))  # from strong to none
+        if t < 0.7:
+            # 🌀 Phase 1: Deep Blur -> Reveal (0s - 2.8s)
+            progress = t / 0.7
+            eased = progress ** 2
+            # Deep blur (even stronger)
+            blur_strength = int(np.interp(1 - eased, [0, 1], [55, 1]))  # deep blur → sharp
 
             if blur_strength % 2 == 0:
                 blur_strength += 1  # must be odd for cv2.GaussianBlur
@@ -26,31 +27,16 @@ def animate_blur_reveal(image, out_path, fps=24):
             blurred = cv2.GaussianBlur(image, (blur_strength, blur_strength), 0)
             animated = blurred
 
-        elif t < 0.8:
-            # 🟢 Phase 2: Vertical reveal (1.6s - 3.2s)
-            progress = (t - 0.4) / 0.4
-            eased = progress ** 2
-            reveal_h = int(height * eased * 0.5)
-
-            animated = np.zeros_like(image)
-            center_y = height // 2
-            y1 = max(center_y - reveal_h, 0)
-            y2 = min(center_y + reveal_h, height)
-            animated[y1:y2, :] = image[y1:y2, :]
-
         else:
-            # 🔍 Phase 3: Slow zoom (3.2s - 4s)
-            progress = (t - 0.8) / 0.2
-            eased = (1 - np.cos(progress * np.pi)) / 2
-            zoom_factor = np.interp(eased, [0, 1], [1.0, 1.3])
+            # 🎞️ Phase 2: Gentle camera shake (2.8s - 4s)
+            progress = (t - 0.7) / 0.3
+            eased = np.sin(progress * np.pi * 3) * (1 - progress) * 5  # decreasing oscillation
+            shift_x = int(eased)
+            shift_y = int(eased * 0.5)
 
-            new_w = int(width * zoom_factor)
-            new_h = int(height * zoom_factor)
-            zoomed = cv2.resize(image, (new_w, new_h))
-
-            x1 = (new_w - width) // 2
-            y1 = (new_h - height) // 2
-            animated = zoomed[y1:y1 + height, x1:x1 + width]
+            # translate (simulate shake)
+            M = np.float32([[1, 0, shift_x], [0, 1, shift_y]])
+            animated = cv2.warpAffine(image, M, (width, height))
 
         writer.write(animated)
         written += 1
