@@ -13,7 +13,7 @@ from animations.rotate_zoomin import animate_rotate_zoomin
 from animations.center_reveal_zoomout import animate_center_reveal_zoomout
 from animations.blur_zooming_roatation import animate_smooth_zoom_pan
 from animations.reveal_vertical import animate_reveal_vertical_zoomout
-from animations.blur_reveal6 import animate_blur_reveal  
+from animations.blur_reveal6 import animate_blur_reveal
 from animations.slide_left_zoom_out7 import animate_slide_left_zoom_out7
 
 from animations.utils import fix_mp4
@@ -23,7 +23,7 @@ from animations.utils import fix_mp4
 app = FastAPI(
     title="Image Animation API 🎞️",
     description="Generate animated videos from images using various cinematic effects.",
-    version="1.0.0"
+    version="1.0.1"
 )
 
 # ✅ Static serve for outputs folder
@@ -61,9 +61,10 @@ def home():
             "center_reveal_zoomout",
             "smooth_zoom_pan",
             "reveal_vertical_zoomout",
-            "blur_reveal"  # 👈 newly added animation
+            "blur_reveal",
+            "slide_left_zoom_out7"  # 👈 newly added animation
         ],
-        "example_request": "/process?image_url=https://yourimage.jpg&animation=blur_reveal"
+        "example_request": "/process?image_url=https://yourimage.jpg&animation=slide_left_zoom_out7"
     }
 
 
@@ -76,7 +77,7 @@ async def process(
         "reveal_zoomout",
         description=(
             "Animation type: reveal_zoomout | rotate_zoomin | smooth_zoom_pan | "
-            "reveal_vertical_zoomout | center_reveal_zoomout | blur_reveal"
+            "reveal_vertical_zoomout | center_reveal_zoomout | blur_reveal | slide_left_zoom_out7"
         )
     ),
 ):
@@ -101,6 +102,8 @@ async def process(
             duration, frames = animate_reveal_vertical_zoomout(img, out_path)
         elif animation == "blur_reveal":
             duration, frames = animate_blur_reveal(img, out_path)
+        elif animation == "slide_left_zoom_out7":
+            duration, frames = animate_slide_left_zoom_out7(img, out_path)
         else:
             return {"error": f"❌ Invalid animation type: {animation}"}
 
