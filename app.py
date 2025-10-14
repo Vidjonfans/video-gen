@@ -4,7 +4,7 @@ import aiohttp
 import os
 import uuid
 import asyncio
-from fastapi import FastAPI, Query, Request, BackgroundTasks, Response
+from fastapi import FastAPI, Query, Request, Response
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
@@ -23,7 +23,7 @@ from animations.utils import fix_mp4
 app = FastAPI(
     title="Image Animation API 🎞️",
     description="Generate animated videos from images using various cinematic effects.",
-    version="1.0.2"
+    version="2.0.0"
 )
 
 # ✅ Static serve for outputs folder
@@ -75,9 +75,9 @@ async def fetch_image(url: str):
         return None
 
 
-# ---- Background processing task ----
-async def run_animation_task(img, out_path, animation):
-    """Run animation in background"""
+# ---- Helper: run animation synchronously ----
+def run_animation_sync(img, out_path, animation):
+    """Run animation synchronously (CPU-bound)"""
     try:
         if animation == "reveal_zoomout":
             duration, frames = animate_reveal_zoomout(img, out_path)
@@ -100,40 +100,57 @@ async def run_animation_task(img, out_path, animation):
         fix_mp4(out_path)
         print(f"[INFO] Animation '{animation}' completed successfully → {out_path}")
         return duration, frames
-
     except Exception as e:
         print(f"[ERROR] Animation failed: {e}")
-        return None, None
+        raise
 
 
 # ---- Main processing endpoint ----
 @app.get("/process")
 async def process(
     request: Request,
-    background_tasks: BackgroundTasks,
     image_url: str = Query(..., description="Public image URL"),
     animation: str = Query("reveal_zoomout"),
 ):
-    """Download image and apply selected animation."""
+    """Download image and apply selected animation (fully synchronous)."""
     img = await fetch_image(image_url)
     if img is None:
         return {"error": "❌ Image download failed or invalid URL"}
 
     out_path = os.path.join(OUTDIR, f"anim_{uuid.uuid4().hex}.mp4")
 
-    # ✅ Run heavy animation in background
-    background_tasks.add_task(run_animation_task, img, out_path, animation)
+    # ✅ Run in background thread (non-blocking for event loop)
+    try:
+        loop = asyncio.get_event_loop()
+        duration, frames = await loop.run_in_executor(
+            None, lambda: run_animation_sync(img, out_path, animation)
+        )
+    except Exception as e:
+        return {"error": f"❌ Animation processing failed: {str(e)}"}
 
-    # ✅ Build output URL for later access
+    # ✅ Wait until file is actually written
+    timeout = 30  # seconds
+    for _ in range(timeout):
+        if os.path.exists(out_path) and os.path.getsize(out_path) > 5000:
+            break
+        await asyncio.sleep(1)
+
+    if not os.path.exists(out_path):
+        return {"error": "⚠️ Video generation failed or file missing."}
+
+    # ✅ Build output URL for the final video
     base_url = str(request.base_url).rstrip("/")
     file_name = os.path.basename(out_path)
     video_url = f"{base_url}/outputs/{file_name}"
 
+    print(f"[SUCCESS] Video ready at: {video_url}")
+
     return {
-        "status": "🟡 Processing started in background",
+        "status": "✅ Success",
         "animation": animation,
+        "duration_seconds": duration,
+        "frames_written": frames,
         "video_url": video_url,
-        "note": "Check the above URL after a few seconds to download the generated video.",
     }
 
 
@@ -141,7 +158,6 @@ async def process(
 @app.on_event("startup")
 async def startup_event():
     print("🚀 Initializing Animation API...")
-    # Render health check को time देने के लिए delay
     await asyncio.sleep(5)
     print("✅ Startup complete. Ready to process requests.")
 
