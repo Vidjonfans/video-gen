@@ -3,3 +3,6 @@ uvicorn
 opencv-python-headless
 numpy
 aiohttp
+flask
+requests
+cloudinary
