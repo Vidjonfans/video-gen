@@ -4,63 +4,78 @@ import aiohttp
 import os
 import uuid
 import asyncio
+import requests  # 🔹 Added for Cloudinary upload
 from fastapi import FastAPI, Query, Request, Response
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+import sys, os
+sys.path.append(os.path.join(os.getcwd(), "venv", "Lib", "site-packages"))
+print("✅ Custom site-packages path added:", os.path.join(os.getcwd(), "venv", "Lib", "site-packages"))
 
-# ✅ Import animation functions
-from animations.reveal_zoomout import animate_reveal_zoomout
-from animations.rotate_zoomin import animate_rotate_zoomin
-from animations.center_reveal_zoomout import animate_center_reveal_zoomout
-from animations.blur_zooming_roatation import animate_smooth_zoom_pan
-from animations.reveal_vertical import animate_reveal_vertical_zoomout
-from animations.blur_reveal6 import animate_blur_reveal
+# ✅ Import animations + utils
+from animations.collage_tapestry import animate_collage_tapestry
 from animations.slide_left_zoom_out7 import animate_slide_left_zoom_out7
+from animations.zoom_blur_video1 import animate_zoom_blur_video1
+from animations.zoom_transition2 import animate_zoom_transition2
+from animations.vertical_wipe_video3 import animate_vertical_wipe_video3
 
-from animations.utils import fix_mp4
+
+
+
+
+
+from animations.utils import fix_mp4, add_audio_to_video
+
 
 # ✅ FastAPI app
 app = FastAPI(
-    title="Image Animation API 🎞️",
-    description="Generate animated videos from images using various cinematic effects.",
-    version="2.0.0"
+    title="🎬 Image Animation API with Audio",
+    description="Generate animated videos from images using cinematic effects and custom audio.",
+    version="2.3.0"
 )
 
-# ✅ Static serve for outputs folder
+# ✅ Enable CORS for all origins (Flutter Web fix)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ✅ Output folder setup
 OUTDIR = "outputs"
 os.makedirs(OUTDIR, exist_ok=True)
 app.mount("/outputs", StaticFiles(directory=OUTDIR), name="outputs")
 
 
-# ---- Handle Render health check ----
+# ---- Health check ----
 @app.head("/")
 async def head_check():
-    """Handle Render HEAD request for health checks"""
     return Response(status_code=200)
 
 
 # ---- Root endpoint ----
 @app.get("/")
 async def home():
-    """Root endpoint listing available animation types."""
     return {
-        "message": "🎬 Animation API running successfully!",
+        "message": "🎥 Animation API is running!",
         "available_animations": [
-            "reveal_zoomout",
-            "rotate_zoomin",
-            "center_reveal_zoomout",
-            "smooth_zoom_pan",
-            "reveal_vertical_zoomout",
-            "blur_reveal",
+            "collage_tapestry",
+            "zoom_blur_video1",
             "slide_left_zoom_out7"
+            "zoom_transition2",
+            "vertical_wipe_video3",
+            
         ],
-        "example_request": "/process?image_url=https://yourimage.jpg&animation=slide_left_zoom_out7"
+        "example_request": "/process?image_url=https://yourimage.jpg&animation=zoomin_zoomout_fadein2&audio_url=https://youraudio.aac"
     }
 
 
-# ---- Helper: download image ----
+# ---- Helper: Download image ----
 async def fetch_image(url: str):
-    """Download image from a public URL and return as OpenCV array."""
+    """Download image from public URL."""
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url, timeout=30) as resp:
@@ -75,93 +90,185 @@ async def fetch_image(url: str):
         return None
 
 
-# ---- Helper: run animation synchronously ----
-def run_animation_sync(img, out_path, animation):
-    """Run animation synchronously (CPU-bound)"""
+# ---- Helper: Upload video to Cloudinary ----
+def upload_to_cloudinary(local_path: str):
+    """Upload the video to Cloudinary and return its secure URL."""
+    cloud_name = "dvsubaggj"
+    upload_preset = "flutter_unsigned_upload"
+    url = f"https://api.cloudinary.com/v1_1/{cloud_name}/video/upload"
+
     try:
-        if animation == "reveal_zoomout":
-            duration, frames = animate_reveal_zoomout(img, out_path)
-        elif animation == "rotate_zoomin":
-            duration, frames = animate_rotate_zoomin(img, out_path)
-        elif animation == "center_reveal_zoomout":
-            duration, frames = animate_center_reveal_zoomout(img, out_path)
-        elif animation == "smooth_zoom_pan":
-            duration, frames = animate_smooth_zoom_pan(img, out_path)
-        elif animation == "reveal_vertical_zoomout":
-            duration, frames = animate_reveal_vertical_zoomout(img, out_path)
-        elif animation == "blur_reveal":
-            duration, frames = animate_blur_reveal(img, out_path)
+        with open(local_path, "rb") as file_data:
+            res = requests.post(
+                url,
+                files={"file": file_data},
+                data={"upload_preset": upload_preset},
+                timeout=120
+            )
+        result = res.json()
+        if res.status_code == 200:
+            secure_url = result["secure_url"]
+            print(f"[✅] Cloudinary upload successful → {secure_url}")
+            return secure_url
+        else:
+            print(f"[❌] Cloudinary upload failed → {result}")
+            return None
+    except Exception as e:
+        print(f"[ERROR] Upload to Cloudinary failed: {e}")
+        return None
+
+# ---- Animation runner (Updated to accept 'imgs' list) ----
+# NOTE: The parameter name is changed from 'img' to 'imgs' for clarity, 
+# and it now expects a list of images.
+
+
+
+
+
+
+def run_animation_sync(imgs: list, out_path, animation, audio_url=None):
+    """Run selected animation with a list of images and optionally add audio."""
+    try:
+        # ✅ Select animation
+        if animation == "collage_tapestry":
+            duration, frames = animate_collage_tapestry(imgs, out_path) 
         elif animation == "slide_left_zoom_out7":
-            duration, frames = animate_slide_left_zoom_out7(img, out_path)
+            duration, frames = animate_slide_left_zoom_out7(imgs, out_path) 
+        elif animation == "zoom_blur_video1":
+            duration, frames = animate_zoom_blur_video1(imgs, out_path)
+        elif animation == "zoom_transition2":
+            duration, frames = animate_zoom_transition2(imgs, out_path)
+        elif animation == "vertical_wipe_video3":
+            duration, frames = animate_vertical_wipe_video3(imgs, out_path)
+
+
+
         else:
             raise ValueError(f"Invalid animation type: {animation}")
-
-        # ✅ Convert to MP4
+        
+        # ... (rest of the run_animation_sync function remains the same) ...
+        # ... (fix_mp4, add_audio_to_video logic) ...
+        
+        # ⚠️ WARNING: Your provided code for run_animation_sync was incomplete/incorrectly nested.
+        # Assuming the rest of the logic (fix_mp4, add_audio_to_video) is outside the if/else block
+        
+        # ✅ Re-encode for browser
         fix_mp4(out_path)
+
+        # ✅ Add custom audio (if provided)
+        if audio_url:
+            out_with_audio = out_path.replace(".mp4", "_audio.mp4")
+            added = add_audio_to_video(out_path, audio_url, out_with_audio)
+            if added:
+                os.replace(out_with_audio, out_path)
+                print(f"[INFO] Audio added from {audio_url}")
+
         print(f"[INFO] Animation '{animation}' completed successfully → {out_path}")
         return duration, frames
+
     except Exception as e:
         print(f"[ERROR] Animation failed: {e}")
         raise
 
-
-# ---- Main processing endpoint ----
+# ---- Main endpoint (Corrected to handle one batch process) ----
 @app.get("/process")
 async def process(
     request: Request,
-    image_url: str = Query(..., description="Public image URL"),
-    animation: str = Query("reveal_zoomout"),
+    total_images: int = Query(..., ge=1, le=7, description="Total number of images user wants to upload (1–7)"),
+    image_url1: str = Query(..., description="Image URL 1 (Required)"),
+    image_url2: str = Query(None, description="Image URL 2"),
+    image_url3: str = Query(None, description="Image URL 3"),
+    image_url4: str = Query(None, description="Image URL 4"),
+    image_url5: str = Query(None, description="Image URL 5"),
+    image_url6: str = Query(None, description="Image URL 6"),
+    image_url7: str = Query(None, description="Image URL 7"),
+    animation: str = Query(..., description="Animation type (Required)"),
+    audio_url: str = Query(None, description="Optional audio URL (MP3, AAC, etc.)")
 ):
-    """Download image and apply selected animation (fully synchronous)."""
-    img = await fetch_image(image_url)
-    if img is None:
-        return {"error": "❌ Image download failed or invalid URL"}
+    """
+    🎞️ Accepts up to 7 image URLs, downloads them, and creates a single animated video.
+    """
+    if total_images < 1 or total_images > 7:
+        return {"error": "❌ 'total_images' must be between 1 and 7."}
+
+    # ✅ Collect provided image URLs 
+    # NOTE: Using the image URLs defined in the query parameters
+    all_urls = [image_url1, image_url2, image_url3, image_url4, image_url5, image_url6, image_url7]
+    image_urls_to_use = [url for url in all_urls[:total_images] if url]
+
+    # ✅ Validate image count
+    if len(image_urls_to_use) != total_images:
+        return {
+            "error": f"⚠️ You specified {total_images} images but provided {len(image_urls_to_use)} URLs.",
+            "hint": "Please match the number of URLs with 'total_images'."
+        }
+
+    # 1. Download images asynchronously
+    print(f"[INFO] Downloading {total_images} image(s)...")
+    download_tasks = [fetch_image(url) for url in image_urls_to_use]
+    # The result is a list of image numpy arrays
+    images = await asyncio.gather(*download_tasks) 
+
+    # Check for any failed downloads
+    if any(img is None for img in images):
+        return {"error": "❌ Failed to fetch one or more images from the provided URLs."}
 
     out_path = os.path.join(OUTDIR, f"anim_{uuid.uuid4().hex}.mp4")
 
-    # ✅ Run in background thread (non-blocking for event loop)
+    # 2. Run animation (Passing the list of images: 'images')
     try:
         loop = asyncio.get_event_loop()
         duration, frames = await loop.run_in_executor(
-            None, lambda: run_animation_sync(img, out_path, animation)
+            None, lambda: run_animation_sync(images, out_path, animation, audio_url)
         )
     except Exception as e:
+        # If the animation fails, return the error directly
         return {"error": f"❌ Animation processing failed: {str(e)}"}
 
-    # ✅ Wait until file is actually written
-    timeout = 30  # seconds
-    for _ in range(timeout):
-        if os.path.exists(out_path) and os.path.getsize(out_path) > 5000:
-            break
-        await asyncio.sleep(1)
-
+    # 3. Wait for output (Removed the timeout check for simplicity, assuming run_in_executor completes sync task)
+    
     if not os.path.exists(out_path):
         return {"error": "⚠️ Video generation failed or file missing."}
 
-    # ✅ Build output URL for the final video
-    base_url = str(request.base_url).rstrip("/")
-    file_name = os.path.basename(out_path)
-    video_url = f"{base_url}/outputs/{file_name}"
+    # 4. Upload to Cloudinary directly
+    cloudinary_url = upload_to_cloudinary(out_path)
 
-    print(f"[SUCCESS] Video ready at: {video_url}")
+    if not cloudinary_url:
+        return {"error": "❌ Failed to upload video to Cloudinary."}
+
+    # 5. Cleanup local file after upload
+    try:
+        os.remove(out_path)
+        print(f"[INFO] Local file deleted after upload.")
+    except Exception:
+        pass
+
+    # 6. Response
+    print(f"[SUCCESS] Final Cloudinary URL: {cloudinary_url}")
 
     return {
         "status": "✅ Success",
         "animation": animation,
+        "image_count_used": len(images), 
+        "audio_attached": bool(audio_url),
         "duration_seconds": duration,
         "frames_written": frames,
-        "video_url": video_url,
+        "video_url": cloudinary_url, # 🔹 Public Cloudinary URL
     }
 
 
-# ---- Startup event for Render stabilization ----
+
+
+
+
+# ---- Startup Event ----
 @app.on_event("startup")
 async def startup_event():
     print("🚀 Initializing Animation API...")
-    await asyncio.sleep(5)
-    print("✅ Startup complete. Ready to process requests.")
+    await asyncio.sleep(3)
+    print("✅ Ready to process requests.")
 
 
-# ---- Run the app ----
+# ---- Run locally ----
 if __name__ == "__main__":
     uvicorn.run("app:app", host="0.0.0.0", port=10000, reload=False)
