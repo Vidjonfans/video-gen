@@ -1,0 +1,154 @@
+import cv2
+import numpy as np
+import requests
+from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
+
+
+# ✅ I. सहायक फ़ंक्शन (Helper Functions)
+#Required Imgae 3
+
+def load_image(source):
+    """Load image from numpy array, local path, or URL."""
+    # ... (Implementation is correct and robust) ...
+    if isinstance(source, np.ndarray):
+        return source
+    if not isinstance(source, str):
+        raise ValueError("❌ Invalid image source type. Must be path, URL, or numpy array.")
+
+    if source.startswith("http://") or source.startswith("https://"):
+        try:
+            resp = requests.get(source, timeout=10)
+            arr = np.asarray(bytearray(resp.content), dtype=np.uint8)
+            img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        except Exception as e:
+            raise ValueError(f"❌ Failed to load image from URL: {e}")
+    else:
+        img = cv2.imread(source)
+
+    if img is None:
+        raise ValueError(f"❌ Could not load image from: {source}")
+    return img
+
+
+def ease_in_out(t):
+    """Smooth ease-in-out curve."""
+    return t * t * (3 - 2 * t)
+
+
+def zoom_frame(img, scale, target_size):
+    """
+    Apply centered zoom to image and ensures output matches target_size EXACTLY (W, H).
+    """
+    w, h = target_size # target_size is (Width, Height)
+    
+    # 1. Zoom the image
+    zoomed_w = max(1, int(w * scale))
+    zoomed_h = max(1, int(h * scale))
+
+    zoomed = cv2.resize(img, (zoomed_w, zoomed_h), interpolation=cv2.INTER_LINEAR)
+    
+    zh, zw = zoomed.shape[:2] # Zoomed height, Zoomed width
+
+    # 2. Center Crop to (h, w)
+    start_y = (zh - h) // 2
+    start_x = (zw - w) // 2
+    end_y = start_y + h
+    end_x = start_x + w
+
+    cropped = zoomed[
+        max(0, start_y):min(zh, end_y), 
+        max(0, start_x):min(zw, end_x)
+    ]
+    
+    # 3. Final Forced Resize (Guarantees MoviePy compatibility)
+    final_frame = cv2.resize(cropped, (w, h))
+    
+    return final_frame
+
+
+# ✅ II. मुख्य एनीमेशन फ़ंक्शन (Main Animation Function)
+
+def animate_zoom_blur_video1(image_paths, out_path="output.mp4", fps=30):
+    """
+    Animate images with 0.3s Zoom-In transition followed by 3.0s Hold.
+    """
+    if len(image_paths) < 1:
+        raise ValueError("❌ कम से कम एक छवि आवश्यक है। (At least one image is required.)")
+
+    # 🚨 बदलाव यहाँ है: Reel/Shorts/TikTok size (Width=1080, Height=1920)
+    target_size = (1080, 1920) 
+    
+    # Robustness Check for the first image
+    try:
+        first_img = load_image(image_paths[0])
+        if first_img is None or first_img.size == 0 or first_img.ndim != 3:
+             raise ValueError("Loaded image is empty or has incorrect dimensions.")
+        first_img = cv2.resize(first_img, target_size)
+    except Exception as e:
+        raise ValueError(f"❌ पहली छवि लोड/रीसाइज़ करने में विफल: {e}")
+
+    frames_list = []
+    
+    duration_zoom = 0.9
+    duration_hold = 3.0
+    
+    total_frames_zoom = int(duration_zoom * fps)
+    total_frames_hold = int(duration_hold * fps)
+    
+    START_SCALE = 1.2
+    END_SCALE = 1.0
+    SCALE_DIFF = START_SCALE - END_SCALE
+
+    print(f"[INFO] 🎬 एनीमेशन शुरू हो रहा है ({len(image_paths)} छवियां, {fps} FPS)")
+
+    for img_path in image_paths:
+        try:
+            if isinstance(img_path, np.ndarray):
+                img = img_path
+            else:
+                img = load_image(img_path)
+                
+            if img is None or img.size == 0 or img.ndim != 3:
+                 print(f"[ERROR] ❌ Image array is invalid. Skipping.")
+                 continue
+
+            img = cv2.resize(img, target_size)
+        except Exception as e:
+            print(f"[ERROR] ❌ Processing failed for an image: {e}. Skipping.")
+            continue
+
+
+        # ✅ चरण 1: Zoom-In (0.3s)
+        for i in range(total_frames_zoom):
+            t = ease_in_out(i / total_frames_zoom)
+            scale = START_SCALE - SCALE_DIFF * t 
+            frame = zoom_frame(img, scale, target_size)
+            frames_list.append(frame)
+
+        # ✅ चरण 2: Hold (3.0s)
+        for _ in range(total_frames_hold):
+            frames_list.append(img.copy())
+
+    # ✅ वीडियो निर्यात (Export Video)
+    if not frames_list:
+        raise ValueError("❌ कोई भी फ्रेम उत्पन्न नहीं हुआ। कृपया अपनी छवियों के पथ जांचें।")
+        
+    # 🚨 बदलाव यहाँ है: अपेक्षित आकार अब (1920, 1080, 3) है
+    expected_shape = (target_size[1], target_size[0], 3) # (H, W, C)
+    if not all(f.shape == expected_shape for f in frames_list):
+        raise ValueError("❌ Final Frame Size Mismatch: Frames still have inconsistent dimensions.")
+        
+    # Moviepy BGR को RGB में बदलें
+    clip = ImageSequenceClip([cv2.cvtColor(f, cv2.COLOR_BGR2RGB) for f in frames_list], fps=fps)
+    
+    clip.write_videofile(
+        out_path, 
+        codec="libx264", 
+        audio=False,
+        logger=None
+    )
+    
+    duration = (duration_zoom + duration_hold) * len(image_paths) 
+    print(f"\n[INFO] ✅ वीडियो सफलतापूर्वक बनाया गया → {out_path} (Duration: {duration:.2f}s, Resolution: 1080x1920)")
+    
+    return duration, len(frames_list)
