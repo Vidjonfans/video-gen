@@ -6,3 +6,5 @@ aiohttp
 flask
 requests
 cloudinary
+moviepy==1.0.3
+
