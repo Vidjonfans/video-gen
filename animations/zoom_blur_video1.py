@@ -72,83 +72,76 @@ def animate_zoom_blur_video1(image_paths, out_path="output.mp4", fps=30):
     """
     Animate images with 0.3s Zoom-In transition followed by 3.0s Hold.
     """
-    if len(image_paths) < 1:
-        raise ValueError("❌ कम से कम एक छवि आवश्यक है। (At least one image is required.)")
 
-    # 🚨 बदलाव यहाँ है: Reel/Shorts/TikTok size (Width=1080, Height=1920)
-    target_size = (1080, 1920) 
-    
-    # Robustness Check for the first image
-    try:
-        first_img = load_image(image_paths[0])
-        if first_img is None or first_img.size == 0 or first_img.ndim != 3:
-             raise ValueError("Loaded image is empty or has incorrect dimensions.")
-        first_img = cv2.resize(first_img, target_size)
-    except Exception as e:
-        raise ValueError(f"❌ पहली छवि लोड/रीसाइज़ करने में विफल: {e}")
+    # 🔥 FIX #1 — Remove nested lists (Render bug)
+    clean_images = []
+    for img in image_paths:
+        if isinstance(img, list):   # Render returns [[array]]
+            img = img[0]
+        clean_images.append(img)
+
+    image_paths = clean_images
+
+    if len(image_paths) < 1:
+        raise ValueError("❌ कम से कम एक छवि आवश्यक है।")
+
+    target_size = (1080, 1920)
+
+    # 🔥 FIX #2 — First image no longer uses load_image()
+    first_img = image_paths[0]
+    if first_img is None or not isinstance(first_img, np.ndarray):
+        raise ValueError("❌ पहली छवि अवैध है।")
+
+    first_img = cv2.resize(first_img, target_size)
 
     frames_list = []
     
     duration_zoom = 0.9
     duration_hold = 3.0
-    
     total_frames_zoom = int(duration_zoom * fps)
     total_frames_hold = int(duration_hold * fps)
-    
+
     START_SCALE = 1.2
     END_SCALE = 1.0
     SCALE_DIFF = START_SCALE - END_SCALE
 
     print(f"[INFO] 🎬 एनीमेशन शुरू हो रहा है ({len(image_paths)} छवियां, {fps} FPS)")
 
-    for img_path in image_paths:
-        try:
-            if isinstance(img_path, np.ndarray):
-                img = img_path
-            else:
-                img = load_image(img_path)
-                
-            if img is None or img.size == 0 or img.ndim != 3:
-                 print(f"[ERROR] ❌ Image array is invalid. Skipping.")
-                 continue
+    for img in image_paths:
 
-            img = cv2.resize(img, target_size)
-        except Exception as e:
-            print(f"[ERROR] ❌ Processing failed for an image: {e}. Skipping.")
+        # 🔥 FIX #3 — Remove load_image completely
+        if img is None or not isinstance(img, np.ndarray):
+            print("[ERROR] Invalid image array. Skipping.")
             continue
 
+        img = cv2.resize(img, target_size)
 
-        # ✅ चरण 1: Zoom-In (0.3s)
+        # Zoom frames
         for i in range(total_frames_zoom):
             t = ease_in_out(i / total_frames_zoom)
-            scale = START_SCALE - SCALE_DIFF * t 
+            scale = START_SCALE - SCALE_DIFF * t
             frame = zoom_frame(img, scale, target_size)
             frames_list.append(frame)
 
-        # ✅ चरण 2: Hold (3.0s)
+        # Hold frames
         for _ in range(total_frames_hold):
             frames_list.append(img.copy())
 
-    # ✅ वीडियो निर्यात (Export Video)
     if not frames_list:
-        raise ValueError("❌ कोई भी फ्रेम उत्पन्न नहीं हुआ। कृपया अपनी छवियों के पथ जांचें।")
-        
-    # 🚨 बदलाव यहाँ है: अपेक्षित आकार अब (1920, 1080, 3) है
-    expected_shape = (target_size[1], target_size[0], 3) # (H, W, C)
+        raise ValueError("❌ कोई फ्रेम उत्पन्न नहीं हुआ।")
+
+    expected_shape = (target_size[1], target_size[0], 3)
     if not all(f.shape == expected_shape for f in frames_list):
-        raise ValueError("❌ Final Frame Size Mismatch: Frames still have inconsistent dimensions.")
-        
-    # Moviepy BGR को RGB में बदलें
-    clip = ImageSequenceClip([cv2.cvtColor(f, cv2.COLOR_BGR2RGB) for f in frames_list], fps=fps)
-    
-    clip.write_videofile(
-        out_path, 
-        codec="libx264", 
-        audio=False,
-        logger=None
+        raise ValueError("❌ Final Frame Size Mismatch.")
+
+    clip = ImageSequenceClip(
+        [cv2.cvtColor(f, cv2.COLOR_BGR2RGB) for f in frames_list],
+        fps=fps
     )
-    
-    duration = (duration_zoom + duration_hold) * len(image_paths) 
-    print(f"\n[INFO] ✅ वीडियो सफलतापूर्वक बनाया गया → {out_path} (Duration: {duration:.2f}s, Resolution: 1080x1920)")
-    
+
+    clip.write_videofile(out_path, codec="libx264", audio=False, logger=None)
+
+    duration = (duration_zoom + duration_hold) * len(image_paths)
+    print(f"[INFO] ✔ वीडियो बनाया गया → {out_path}")
+
     return duration, len(frames_list)
