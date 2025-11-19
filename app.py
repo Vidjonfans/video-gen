@@ -188,72 +188,106 @@ async def process(
     """
     🎞️ Accepts up to 7 image URLs, downloads them, and creates a single animated video.
     """
+
+    print("\n\n==============================")
+    print("🔥 NEW /process REQUEST ARRIVED")
+    print("==============================")
+
+    # --------------------------
+    # Validate count
+    # --------------------------
     if total_images < 1 or total_images > 7:
         return {"error": "❌ 'total_images' must be between 1 and 7."}
 
-    # ✅ Collect provided image URLs 
-    # NOTE: Using the image URLs defined in the query parameters
     all_urls = [image_url1, image_url2, image_url3, image_url4, image_url5, image_url6, image_url7]
     image_urls_to_use = [url for url in all_urls[:total_images] if url]
 
-    # ✅ Validate image count
     if len(image_urls_to_use) != total_images:
         return {
             "error": f"⚠️ You specified {total_images} images but provided {len(image_urls_to_use)} URLs.",
             "hint": "Please match the number of URLs with 'total_images'."
         }
 
-    # 1. Download images asynchronously
     print(f"[INFO] Downloading {total_images} image(s)...")
-    download_tasks = [fetch_image(url) for url in image_urls_to_use]
-    # The result is a list of image numpy arrays
-    images = await asyncio.gather(*download_tasks) 
 
-    # Check for any failed downloads
+    # --------------------------
+    # Download Images
+    # --------------------------
+    download_tasks = [fetch_image(url) for url in image_urls_to_use]
+    images = await asyncio.gather(*download_tasks)
+
+    # Debug line (REQUIRED)
+    print("\n[DEBUG] Raw images from fetch:", [type(i) for i in images])
+
+    # --------------------------
+    # Fix nested lists (Render bug)
+    # --------------------------
+    clean_images = []
+    for img in images:
+        if isinstance(img, list):       # fix for [[array]]
+            print("⚠ FIXED — nested list detected")
+            img = img[0]
+        clean_images.append(img)
+
+    images = clean_images
+
+    print("[DEBUG] After cleaning:", [type(i) for i in images])
+
     if any(img is None for img in images):
         return {"error": "❌ Failed to fetch one or more images from the provided URLs."}
 
+    # --------------------------
+    # Generate output file path
+    # --------------------------
     out_path = os.path.join(OUTDIR, f"anim_{uuid.uuid4().hex}.mp4")
 
-    # 2. Run animation (Passing the list of images: 'images')
+    print(f"[INFO] Running animation → {animation}")
+
+    # --------------------------
+    # Run animation safely
+    # --------------------------
     try:
         loop = asyncio.get_event_loop()
         duration, frames = await loop.run_in_executor(
             None, lambda: run_animation_sync(images, out_path, animation, audio_url)
         )
     except Exception as e:
-        # If the animation fails, return the error directly
+        print("\n[ERROR] Animation failed:", e)
         return {"error": f"❌ Animation processing failed: {str(e)}"}
 
-    # 3. Wait for output (Removed the timeout check for simplicity, assuming run_in_executor completes sync task)
-    
+    # --------------------------
+    # Validate output existence
+    # --------------------------
     if not os.path.exists(out_path):
-        return {"error": "⚠️ Video generation failed or file missing."}
+        return {"error": "⚠ Video generation failed or missing."}
 
-    # 4. Upload to Cloudinary directly
+    # --------------------------
+    # Upload to Cloudinary
+    # --------------------------
     cloudinary_url = upload_to_cloudinary(out_path)
 
     if not cloudinary_url:
         return {"error": "❌ Failed to upload video to Cloudinary."}
 
-    # 5. Cleanup local file after upload
+    # --------------------------
+    # Cleanup
+    # --------------------------
     try:
         os.remove(out_path)
-        print(f"[INFO] Local file deleted after upload.")
-    except Exception:
+        print("[INFO] Local file removed.")
+    except:
         pass
 
-    # 6. Response
-    print(f"[SUCCESS] Final Cloudinary URL: {cloudinary_url}")
+    print("[SUCCESS] Video uploaded:", cloudinary_url)
 
     return {
         "status": "✅ Success",
         "animation": animation,
-        "image_count_used": len(images), 
+        "image_count_used": len(images),
         "audio_attached": bool(audio_url),
         "duration_seconds": duration,
         "frames_written": frames,
-        "video_url": cloudinary_url, # 🔹 Public Cloudinary URL
+        "video_url": cloudinary_url
     }
 
 
