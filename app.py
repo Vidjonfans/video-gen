@@ -19,6 +19,7 @@ from animations.slide_left_zoom_out7 import animate_slide_left_zoom_out7
 from animations.zoom_blur_video1 import animate_zoom_blur_video1
 from animations.zoom_transition2 import animate_zoom_transition2
 from animations.vertical_wipe_video3 import animate_vertical_wipe_video3
+from animations.center_reveal_zoomout import animate_three_slide_right_to_left
 
 
 
@@ -67,6 +68,7 @@ async def home():
             "slide_left_zoom_out7"
             "zoom_transition2",
             "vertical_wipe_video3",
+            "three_slide_right_to_left"
             
         ],
         "example_request": "/process?image_url=https://yourimage.jpg&animation=zoomin_zoomout_fadein2&audio_url=https://youraudio.aac"
@@ -140,6 +142,9 @@ def run_animation_sync(imgs: list, out_path, animation, audio_url=None):
             duration, frames = animate_zoom_transition2(imgs, out_path)
         elif animation == "vertical_wipe_video3":
             duration, frames = animate_vertical_wipe_video3(imgs, out_path)
+        elif animation == "three_slide_right_to_left":
+            duration, frames = animate_three_slide_right_to_left(imgs, out_path)
+
 
 
 
