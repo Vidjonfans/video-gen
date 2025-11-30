@@ -1,44 +1,74 @@
 import cv2
 import numpy as np
+import requests
 from .utils import get_video_duration
 
-def animate_center_reveal_zoomout(image, out_path, fps=24):
-    height, width = image.shape[:2]
-    total_duration = 4
-    frames = fps * total_duration
 
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    writer = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
+def load_image_from_url(url):
+    resp = requests.get(url)
+    arr = np.asarray(bytearray(resp.content), dtype=np.uint8)
+    return cv2.imdecode(arr, cv2.IMREAD_COLOR)
+
+
+def animate_three_slide_right_to_left(image_urls, out_path, fps=24):
+    """
+    3 images → Each 3 seconds → Slide from RIGHT → LEFT.
+    Total video duration = 3 * 3 = 9 seconds.
+    """
+
+    if len(image_urls) != 3:
+        raise ValueError("❌ Exactly 3 images required.")
+
+    # Load images
+    images = [load_image_from_url(u) for u in image_urls]
+
+    # All images resize to first image resolution
+    h, w = images[0].shape[:2]
+    images = [cv2.resize(img, (w, h)) for img in images]
+
+    seconds_per_image = 3
+    frames_per_image = fps * seconds_per_image
+    total_frames = frames_per_image * 3
+
+    writer = cv2.VideoWriter(
+        out_path,
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        fps,
+        (w, h)
+    )
 
     written = 0
-    for f in range(frames):
-        t = f / frames
-        if t < 0.5:
-            progress = t / 0.5
-            eased = progress ** 2
-            reveal_h = int(height * eased * 0.5)
 
-            animated = np.zeros_like(image)
-            center_y = height // 2
+    # --------------- MAIN LOOP --------------------
+    for idx, img in enumerate(images):
 
-            y1 = max(center_y - reveal_h, 0)
-            y2 = min(center_y + reveal_h, height)
-            animated[y1:y2, :] = image[y1:y2, :]
-        else:
-            progress = (t - 0.5) / 0.5
-            eased = (1 - np.cos(progress * np.pi)) / 2
-            zoom_factor = np.interp(eased, [0, 1], [1.0, 1.5])
+        for f in range(frames_per_image):
+            t = f / frames_per_image   # 0 → 1 for each image
 
-            new_w = int(width * zoom_factor)
-            new_h = int(height * zoom_factor)
-            zoomed = cv2.resize(image, (new_w, new_h))
+            # Start from Right → move to Center
+            # Start X = +width
+            # End X = 0
+            start_x = w
+            end_x = 0
+            current_x = int(start_x + (end_x - start_x) * t)
 
-            x1 = (new_w - width) // 2
-            y1 = (new_h - height) // 2
-            animated = zoomed[y1:y1 + height, x1:x1 + width]
+            # Prepare blank frame
+            frame = np.zeros_like(img)
 
-        writer.write(animated)
-        written += 1
+            # Compute overlay area inside frame bounds
+            x1 = max(current_x, 0)
+            x2 = min(current_x + w, w)
+
+            img_x1 = max(0, -current_x)
+            img_x2 = img_x1 + (x2 - x1)
+
+            # Paste image
+            if x2 > x1 and img_x2 > img_x1:
+                frame[:, x1:x2] = img[:, img_x1:img_x2]
+
+            writer.write(frame)
+            written += 1
 
     writer.release()
+
     return get_video_duration(out_path), written
