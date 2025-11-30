@@ -7,7 +7,7 @@ from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
 
 
 # ✅ Background image (fixed)
-BACKGROUND_URL = "c"
+BACKGROUND_URL = "https://res.cloudinary.com/dvsubaggj/image/upload/v1763870545/dq58futjfs3i4m9i0lzn.jpg"
 
 def load_image_from_url(url):
     """Download image from URL and return OpenCV image."""
@@ -124,5 +124,6 @@ def animate_collage_tapestry(images: list, out_path, fps=24):
     print(f"[INFO] Collage tapestry video created → {out_path}")
 
     return get_video_duration(out_path), frames
+
 
 
